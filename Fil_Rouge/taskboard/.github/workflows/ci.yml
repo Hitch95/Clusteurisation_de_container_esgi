@@ -1,0 +1,147 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run lint
+        run: npm run lint
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    needs: lint
+    env:
+      NODE_ENV: test
+      PORT: '3001'
+      DATABASE_URL: postgresql://test:test@localhost:5432/taskboard_test
+      JWT_SECRET: test-jwt-secret
+      DEFAULT_ADMIN_USERNAME: admin
+      DEFAULT_ADMIN_PASSWORD: test-admin-password
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests with coverage
+        run: npm run test:coverage -- --runInBand
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          if-no-files-found: error
+
+  build:
+    name: Build and Push Docker image
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Compute GHCR image name
+        id: image
+        run: echo "image_name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ steps.image.outputs.image_name }}:${{ github.sha }}
+            ${{ steps.image.outputs.image_name }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy via SSH tunnel
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    env:
+      DEPLOY_TUNNEL_HOST: ${{ secrets.DEPLOY_TUNNEL_HOST }}
+      DEPLOY_TUNNEL_HOST: ${{ secrets.DEPLOY_TUNNEL_HOST }}
+      DEPLOY_TUNNEL_PORT: '22'
+      GHCR_USERNAME: ${{ github.actor }}
+      GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      DEFAULT_ADMIN_USERNAME: ${{ secrets.DEFAULT_ADMIN_USERNAME }}
+      DEFAULT_ADMIN_PASSWORD: ${{ secrets.DEFAULT_ADMIN_PASSWORD }}
+    steps:
+      - name: Set up SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+
+      - name: Prepare SSH known hosts
+        run: mkdir -p ~/.ssh
+
+      - name: Setup cloudflared
+        uses: crazy-max/ghaction-setup-cloudflared@v1
+
+    - name: Deploy image through SSH
+        run: |
+          set -euo pipefail
+
+          image_ref="ghcr.io/${GITHUB_REPOSITORY,,}:${GITHUB_SHA}"
+          remote_env="GHCR_USERNAME=$(printf '%q' "$GHCR_USERNAME") GHCR_TOKEN=$(printf '%q' "$GHCR_TOKEN") POSTGRES_USER=$(printf '%q' "$POSTGRES_USER") POSTGRES_PASSWORD=$(printf '%q' "$POSTGRES_PASSWORD") POSTGRES_DB=$(printf '%q' "$POSTGRES_DB") JWT_SECRET=$(printf '%q' "$JWT_SECRET") DEFAULT_ADMIN_USERNAME=$(printf '%q' "$DEFAULT_ADMIN_USERNAME") DEFAULT_ADMIN_PASSWORD=$(printf '%q' "$DEFAULT_ADMIN_PASSWORD")"
+
+          ssh -4 -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=~/.ssh/known_hosts -o ServerAliveInterval=60 -o ProxyCommand="cloudflared access ssh --hostname %h" -p 22 "deployer@$DEPLOY_TUNNEL_HOST" "$remote_env /usr/local/bin/deploy-taskboard.sh $(printf '%q' "$image_ref")"
+
+      - name: Deploy image through SSH
+        run: |
+          set -euo pipefail
+
+          image_ref="ghcr.io/${GITHUB_REPOSITORY,,}:${GITHUB_SHA}"
+          remote_env="GHCR_USERNAME=$(printf '%q' "$GHCR_USERNAME") GHCR_TOKEN=$(printf '%q' "$GHCR_TOKEN") POSTGRES_USER=$(printf '%q' "$POSTGRES_USER") POSTGRES_PASSWORD=$(printf '%q' "$POSTGRES_PASSWORD") POSTGRES_DB=$(printf '%q' "$POSTGRES_DB") JWT_SECRET=$(printf '%q' "$JWT_SECRET") DEFAULT_ADMIN_USERNAME=$(printf '%q' "$DEFAULT_ADMIN_USERNAME") DEFAULT_ADMIN_PASSWORD=$(printf '%q' "$DEFAULT_ADMIN_PASSWORD")"
+
+          ssh -4 -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=~/.ssh/known_hosts -o ServerAliveInterval=60 -o ProxyCommand="cloudflared access ssh --hostname %h" -p 22 "deployer@$DEPLOY_TUNNEL_HOST" "$remote_env /usr/local/bin/deploy-taskboard.sh $(printf '%q' "$image_ref")"

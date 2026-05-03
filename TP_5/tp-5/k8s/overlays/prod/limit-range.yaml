@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: prod-limits
+  namespace: app-prod
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: "500m"
+        memory: "512Mi"
+      defaultRequest:
+        cpu: "250m"
+        memory: "256Mi"
+      max:
+        cpu: "4"
+        memory: "4Gi"
+      min:              # Un container sans ressources minimales → refusé
+        cpu: "100m"
+        memory: "128Mi"
+    - type: Pod
+      max:
+        cpu: "8"
+        memory: "8Gi"
+    - type: PersistentVolumeClaim
+      max:
+        storage: "50Gi"
+      min:
+        storage: "1Gi"

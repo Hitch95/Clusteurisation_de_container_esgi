@@ -1,0 +1,26 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: app-prod
+
+resources:
+  - ../../base
+  - namespace.yaml
+  - serviceaccount.yaml
+  - configmap.yaml
+  - rbac.yaml
+  - resource-quota.yaml
+  - limit-range.yaml
+  - network-policy.yaml
+
+# Patch le déploiement de base pour ajouter le security context PSS-compliant
+patches:
+  - path: deployment-patch.yaml
+    target:
+      kind: Deployment
+      name: demo-app
+
+# En prod, on veut 3 replicas pour la HA
+replicas:
+  - name: demo-app
+    count: 3

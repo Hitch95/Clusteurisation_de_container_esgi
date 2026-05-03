@@ -1,0 +1,12 @@
+services:
+  ssh-server:
+    build:
+      context: .
+      dockerfile: deploy/ssh-server/Dockerfile
+    environment:
+      DEPLOY_PUBLIC_KEY: ${DEPLOY_PUBLIC_KEY:?set DEPLOY_PUBLIC_KEY before starting the deploy stack}
+    ports:
+      - "${SSH_SERVER_PORT:-2222}:22"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped

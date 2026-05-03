@@ -1,0 +1,72 @@
+# ======================================================
+# RÈGLE 1 : Deny-all par défaut (ingress + egress)
+# Tout trafic est bloqué sauf autorisation explicite ci-dessous
+# ======================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: app-prod
+spec:
+  podSelector: {}       # s'applique à TOUS les pods du namespace
+  policyTypes:
+    - Ingress
+    - Egress
+---
+# ======================================================
+# RÈGLE 2 : Autoriser le trafic HTTP entrant vers demo-app
+# uniquement depuis les pods avec le label "role: frontend"
+# ou depuis un ingress controller (label: app.kubernetes.io/name: ingress-nginx)
+# ======================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-demo-app-ingress
+  namespace: app-prod
+spec:
+  podSelector:
+    matchLabels:
+      app: demo-app
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+# ======================================================
+# RÈGLE 3 : Autoriser demo-app à faire des appels DNS
+# (port 53 UDP/TCP vers kube-dns dans kube-system)
+# Sans ça, les pods ne peuvent pas résoudre les noms de service
+# ======================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-egress
+  namespace: app-prod
+spec:
+  podSelector:
+    matchLabels:
+      app: demo-app
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53

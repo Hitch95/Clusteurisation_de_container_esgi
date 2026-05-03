@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: prod-quota
+  namespace: app-prod
+spec:
+  hard:
+    pods: "20"
+    requests.cpu: "8"
+    requests.memory: "8Gi"
+    limits.cpu: "16"
+    limits.memory: "16Gi"
+    services: "10"
+    persistentvolumeclaims: "20"
+    # Empêche la création de NodePort/LoadBalancer non contrôlés
+    services.nodeports: "0"

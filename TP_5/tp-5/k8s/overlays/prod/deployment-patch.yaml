@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-app
+spec:
+  template:
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101        # user "nginx" dans l'image unprivileged
+        runAsGroup: 101
+        fsGroup: 101
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: demo-app
+          image: nginxinc/nginx-unprivileged:alpine
+          ports:
+            - name: http
+              containerPort: 8080
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          volumeMounts:
+            - name: tmp-dir
+              mountPath: /tmp
+            - name: cache-dir
+              mountPath: /var/cache/nginx
+            - name: run-dir
+              mountPath: /var/run
+      volumes:
+        - name: tmp-dir
+          emptyDir: {}
+        - name: cache-dir
+          emptyDir: {}
+        - name: run-dir
+          emptyDir: {}
