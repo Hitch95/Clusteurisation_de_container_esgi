@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "tp-chart.fullname" . }}-api-secondary
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api-secondary
+  template:
+    metadata:
+      labels:
+        app: api-secondary
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:alpine
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "tp-chart.fullname" . }}-api-secondary-service
+spec:
+  selector:
+    app: api-secondary
+  ports:
+    - port: 80
+      targetPort: 80

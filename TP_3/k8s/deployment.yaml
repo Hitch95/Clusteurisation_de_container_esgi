@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tp-docker-hub-app
+  namespace: tp-node-k8s
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tp-docker-hub-app
+  template:
+    metadata:
+      labels:
+        app: tp-docker-hub-app
+    spec:
+      imagePullSecrets:
+        - name: regcred
+      containers:
+        - name: web
+          image: docker.io/blmundo/tp-docker-hub-app:tagname
+          ports:
+            - containerPort: 3000
+          env:
+            - name: PORT
+              value: "3000"
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 3000
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10

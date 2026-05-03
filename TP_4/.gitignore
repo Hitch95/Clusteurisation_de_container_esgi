@@ -1,0 +1,10 @@
+tls.key
+tls.crt
+
+.env
+mysql-secret.yaml
+
+.minikube/
+node_modules/
+.DS_Store
+*.log

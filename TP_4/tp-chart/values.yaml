@@ -1,0 +1,25 @@
+# Valeurs par défaut pour notre application
+replicaCount: 2
+
+image:
+  repository: tp-app-mysql
+  tag: "1.0.0"
+  pullPolicy: Never
+
+mysql:
+  image: mysql:8.0
+  rootPassword: "rootpassword"
+  database: "appdb"
+  user: "appuser"
+  password: "apppassword"
+  storage: 1Gi
+
+ingress:
+  enabled: true
+  host: tp-app-mysql.local
+  tlsSecret: node-app-tls
+
+hpa:
+  minReplicas: 2
+  maxReplicas: 6
+  cpuTarget: 50
